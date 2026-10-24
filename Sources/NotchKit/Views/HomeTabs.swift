@@ -162,7 +162,7 @@ struct HomeBody: View {
             }
             VStack(alignment: .leading, spacing: IslandMetrics.Nook.rowGap * s) {
                 if content.hasEvent {
-                    CalendarRow(calendar: model.calendar)
+                    CalendarRow(model: model, calendar: model.calendar)
                         .frame(height: IslandMetrics.Nook.row * s)
                 }
                 if content.hasTimer {
@@ -248,6 +248,7 @@ private struct MiniProgress: View {
 
 /// The next event, or a button to connect the calendar the first time.
 private struct CalendarRow: View {
+    let model: IslandModel
     let calendar: CalendarService
     @Environment(\.notchScale) private var s
 
@@ -289,6 +290,18 @@ private struct CalendarRow: View {
                 }
                 .buttonStyle(PressableButtonStyle())
                 .accessibilityLabel(Text("Next event, \(event.title)"))
+                if let url = event.meetingURL {
+                    TimelineView(.everyMinute) { context in
+                        if CalendarRules.canJoin(event, at: context.date) {
+                            Button("Join") { model.joinMeeting(url) }
+                                .buttonStyle(ChipButtonStyle(tint: NotchColor.green, scale: s))
+                                .frame(width: 52 * s)
+                                .help(url.host ?? "")
+                                .accessibilityLabel(Text("Join \(event.title)"))
+                        }
+                    }
+                    .fixedSize()
+                }
             }
         }
     }
@@ -313,6 +326,18 @@ private struct TimerPresetsRow: View {
                 .buttonStyle(ChipButtonStyle(scale: s))
                 .accessibilityLabel(Text("Start \(TimeFormatting.spoken(preset)) timer"))
             }
+            Button {
+                model.startFocus()
+            } label: {
+                HStack(spacing: 3 * s) {
+                    Image(systemName: FocusCycle.symbol(.focus))
+                        .font(.system(size: 10 * s, weight: .semibold))
+                    Text("Focus")
+                }
+            }
+            .buttonStyle(ChipButtonStyle(tint: NotchColor.green, scale: s))
+            .help("25 min focus, 5 min break, repeating")
+            .accessibilityLabel(Text("Start focus session"))
         }
     }
 }
@@ -353,37 +378,29 @@ private struct ShortcutsRow: View {
 
 // MARK: Tray
 
-/// Files dropped on the notch. Drag them out, double-click to open, right-click for more.
+/// Files dropped on the notch, and (when turned on) recent copied text. Files: drag them out,
+/// double-click to open, right-click for more. Clips: click to copy again.
 struct TrayBody: View {
     let model: IslandModel
+    @State private var showsClips = false
     @Environment(\.notchScale) private var s
 
     var body: some View {
-        let items = model.tray.items
-        if items.isEmpty {
-            ZStack {
-                RoundedRectangle(cornerRadius: 16 * s, style: .continuous)
-                    .strokeBorder(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
-                VStack(spacing: 6 * s) {
-                    Image(systemName: "tray.and.arrow.down.fill")
-                        .font(.system(size: 20 * s, weight: .semibold))
-                    Text("Drag files onto the notch to keep them here")
-                        .font(.system(size: 12 * s, weight: .medium))
+        HStack(alignment: .center, spacing: 8 * s) {
+            Group {
+                if showsClips {
+                    ClipboardBody(model: model)
+                } else {
+                    FilesBody(model: model)
                 }
-                .foregroundStyle(NotchColor.secondaryText)
             }
-            .padding(.bottom, 2 * s)
-        } else {
-            HStack(alignment: .center, spacing: 8 * s) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6 * s) {
-                        ForEach(items) { item in
-                            TrayItemView(model: model, item: item)
-                        }
-                    }
-                }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 6 * s) {
+                modeButton(clips: false, symbol: "tray.full.fill", label: "Files")
+                modeButton(clips: true, symbol: "doc.on.clipboard.fill", label: "Clipboard")
+                Spacer(minLength: 0)
                 Button {
-                    model.tray.removeAll()
+                    if showsClips { model.clipboard.removeAll() } else { model.tray.removeAll() }
                 } label: {
                     Image(systemName: "xmark.bin.fill")
                         .font(.system(size: 12 * s, weight: .semibold))
@@ -392,11 +409,166 @@ struct TrayBody: View {
                         .background(Circle().fill(NotchColor.buttonFill))
                 }
                 .buttonStyle(PressableButtonStyle())
-                .help("Clear the tray")
-                .accessibilityLabel(Text("Clear the tray"))
+                .disabled(showsClips ? model.clipboard.clips.isEmpty : model.tray.items.isEmpty)
+                .opacity((showsClips ? model.clipboard.clips.isEmpty : model.tray.items.isEmpty) ? 0.4 : 1)
+                .help(showsClips ? "Clear clipboard history" : "Clear the tray")
+                .accessibilityLabel(Text(showsClips ? "Clear clipboard history" : "Clear the tray"))
             }
             .frame(maxHeight: .infinity)
         }
+        .padding(.bottom, 2 * s)
+    }
+
+    private func modeButton(clips: Bool, symbol: String, label: LocalizedStringKey) -> some View {
+        let isSelected = showsClips == clips
+        return Button {
+            showsClips = clips
+        } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 11 * s, weight: .semibold))
+                .foregroundStyle(isSelected ? .white : NotchColor.secondaryText)
+                .frame(width: 28 * s, height: 28 * s)
+                .background(Circle().fill(isSelected ? NotchColor.buttonFill : Color.clear))
+                .contentShape(Circle())
+        }
+        .buttonStyle(PressableButtonStyle())
+        .help(Text(label))
+        .accessibilityLabel(Text(label))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// A dashed placeholder with a message, used by empty Tray views.
+private struct TrayPlaceholder<Accessory: View>: View {
+    let symbol: String
+    let message: LocalizedStringKey
+    @ViewBuilder var accessory: Accessory
+    @Environment(\.notchScale) private var s
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 16 * s, style: .continuous)
+                .strokeBorder(Color.white.opacity(0.2), style: StrokeStyle(lineWidth: 1.2, dash: [5, 4]))
+            VStack(spacing: 6 * s) {
+                Image(systemName: symbol)
+                    .font(.system(size: 20 * s, weight: .semibold))
+                Text(message)
+                    .font(.system(size: 12 * s, weight: .medium))
+                    .multilineTextAlignment(.center)
+                accessory
+            }
+            .foregroundStyle(NotchColor.secondaryText)
+            .padding(.horizontal, 12 * s)
+        }
+    }
+}
+
+private struct FilesBody: View {
+    let model: IslandModel
+    @Environment(\.notchScale) private var s
+
+    var body: some View {
+        let items = model.tray.items
+        if items.isEmpty {
+            TrayPlaceholder(symbol: "tray.and.arrow.down.fill", message: "Drag files onto the notch to keep them here") {
+                EmptyView()
+            }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6 * s) {
+                    ForEach(items) { item in
+                        TrayItemView(model: model, item: item)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ClipboardBody: View {
+    let model: IslandModel
+    @Environment(\.notchScale) private var s
+
+    var body: some View {
+        let clips = model.clipboard.clips
+        if !model.settings.clipboardHistoryEnabled {
+            TrayPlaceholder(symbol: "doc.on.clipboard", message: "Keep the last 20 texts you copy. Memory only, skips passwords.") {
+                Button("Turn On") { model.settings.clipboardHistoryEnabled = true }
+                    .buttonStyle(ChipButtonStyle(tint: .white, scale: s))
+                    .fixedSize()
+            }
+        } else if clips.isEmpty {
+            TrayPlaceholder(symbol: "doc.on.clipboard", message: "Copy some text and it shows up here") {
+                EmptyView()
+            }
+        } else {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6 * s) {
+                    ForEach(clips) { clip in
+                        ClipCard(model: model, clip: clip)
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct ClipCard: View {
+    let model: IslandModel
+    let clip: ClipboardHistory.Clip
+    @State private var isHovering = false
+    @Environment(\.notchScale) private var s
+
+    var body: some View {
+        let copied = model.clipboard.lastCopiedID == clip.id
+        VStack(alignment: .leading, spacing: 4 * s) {
+            Text(clip.text.trimmingCharacters(in: .whitespacesAndNewlines))
+                .font(.system(size: 11 * s, weight: .medium))
+                .foregroundStyle(.white.opacity(0.9))
+                .lineLimit(4)
+                .truncationMode(.tail)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            HStack(spacing: 4 * s) {
+                if copied {
+                    Image(systemName: "checkmark")
+                    Text("Copied")
+                } else {
+                    Text(clip.date, style: .relative)
+                }
+            }
+            .font(.system(size: 9 * s, weight: .semibold))
+            .foregroundStyle(copied ? NotchColor.green : NotchColor.secondaryText)
+            .lineLimit(1)
+        }
+        .padding(8 * s)
+        .frame(width: 150 * s)
+        .frame(maxHeight: .infinity)
+        .background(RoundedRectangle(cornerRadius: 12 * s, style: .continuous).fill(Color.white.opacity(isHovering ? 0.14 : 0.07)))
+        .overlay(alignment: .topTrailing) {
+            if isHovering {
+                Button { model.clipboard.remove(clip.id) } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.system(size: 14 * s))
+                        .symbolRenderingMode(.palette)
+                        .foregroundStyle(.white, Color(white: 0.35))
+                }
+                .buttonStyle(PressableButtonStyle())
+                .padding(3 * s)
+                .accessibilityLabel(Text("Remove clip"))
+            }
+        }
+        .contentShape(Rectangle())
+        .onHover { isHovering = $0 }
+        .onTapGesture { model.copyClip(clip) }
+        .contextMenu {
+            Button("Copy") { model.copyClip(clip) }
+            Divider()
+            Button("Remove") { model.clipboard.remove(clip.id) }
+        }
+        .help("Click to copy")
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isButton)
+        .accessibilityHint(Text("Copies this text"))
     }
 }
 

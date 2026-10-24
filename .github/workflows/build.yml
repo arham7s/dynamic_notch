@@ -19,6 +19,10 @@ jobs:
           sudo xcode-select -s "$X"
           echo "::notice::Using $X"
           swift --version 2>&1 | head -1 | sed 's/^/::notice::/'
+      - name: Tests and strict build
+        run: |
+          set -o pipefail
+          ./Scripts/check.sh 2>&1 | tee check.log || { grep -E 'error:|failed|✘' check.log | head -30 | sed 's/^/::error::/'; tail -5 check.log | sed 's/^/::error::/'; exit 1; }
       - name: Build Dynamic Notch.app
         run: |
           set -o pipefail

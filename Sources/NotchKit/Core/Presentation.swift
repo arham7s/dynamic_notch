@@ -26,8 +26,10 @@ public enum IslandAlert: Equatable, Sendable {
     case welcome
     /// Volume or brightness changed. `value` is 0…1.
     case level(LevelKind, value: Double, muted: Bool)
-    /// A calendar event is about to start.
-    case upcomingEvent(title: String, minutes: Int)
+    /// A calendar event is about to start. `meetingURL` adds a "Join" button.
+    case upcomingEvent(title: String, minutes: Int, meetingURL: URL? = nil)
+    /// A focus (Pomodoro) phase just ended and the next one started.
+    case focusPhase(FocusCycle.Phase, completed: Int)
     /// A shortcut run from the notch finished.
     case shortcut(name: String, succeeded: Bool)
 
@@ -51,7 +53,7 @@ public enum IslandAlert: Equatable, Sendable {
         switch self {
         case .charging, .lowBattery: .power
         case .headphones: .headphones
-        case .timerFinished: .timer
+        case .timerFinished, .focusPhase: .timer
         case .welcome: .app
         case .level: .level
         case .upcomingEvent: .calendar
@@ -69,7 +71,9 @@ public enum IslandAlert: Equatable, Sendable {
         case .timerFinished: 600
         case .welcome: 4
         case .level: 1.6
-        case .upcomingEvent: 8
+        // Long enough to reach the Join button.
+        case .upcomingEvent(_, _, let meetingURL): meetingURL == nil ? 8 : 20
+        case .focusPhase: 4
         case .shortcut: 2.5
         }
     }

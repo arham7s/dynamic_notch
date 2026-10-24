@@ -16,6 +16,7 @@ public final class IslandModel {
     public let calendar: CalendarService
     public let shortcuts: ShortcutsService
     public let levels: LevelMonitor
+    public let clipboard: ClipboardHistory
     let camera = CameraAccess()
 
     public var screen: ScreenMetrics = .sample
@@ -42,6 +43,8 @@ public final class IslandModel {
     @ObservationIgnored public var onOpenSettings: (() -> Void)?
 
     @ObservationIgnored private let alarm = AlarmSound()
+    /// Kept alive while the focus chime plays.
+    @ObservationIgnored private var chime: NSSound?
     @ObservationIgnored private var alertTask: Task<Void, Never>?
     @ObservationIgnored private var collapseTask: Task<Void, Never>?
     @ObservationIgnored private var hoverExpandTask: Task<Void, Never>?
@@ -60,7 +63,8 @@ public final class IslandModel {
         tray: TrayStore = TrayStore(),
         calendar: CalendarService = CalendarService(),
         shortcuts: ShortcutsService = ShortcutsService(),
-        levels: LevelMonitor = LevelMonitor()
+        levels: LevelMonitor = LevelMonitor(),
+        clipboard: ClipboardHistory = ClipboardHistory()
     ) {
         self.settings = settings
         self.nowPlaying = nowPlaying
@@ -72,11 +76,12 @@ public final class IslandModel {
         self.calendar = calendar
         self.shortcuts = shortcuts
         self.levels = levels
+        self.clipboard = clipboard
 
         calendar.onReminder = { [weak self] event in
             guard let self, self.settings.calendarEnabled else { return }
             let minutes = max(0, Int((event.start.timeIntervalSinceNow / 60).rounded()))
-            self.receive(.upcomingEvent(title: event.title, minutes: minutes))
+            self.receive(.upcomingEvent(title: event.title, minutes: minutes, meetingURL: event.meetingURL))
         }
         shortcuts.onFinish = { [weak self] name, succeeded in
             self?.receive(.shortcut(name: name, succeeded: succeeded))
@@ -103,6 +108,7 @@ public final class IslandModel {
         audioRoute.start()
         calendar.start()
         levels.start()
+        updateClipboardWatching()
         if !settings.hasShownWelcome {
             settings.hasShownWelcome = true
             Task { [weak self] in
@@ -119,6 +125,7 @@ public final class IslandModel {
         audioRoute.stop()
         calendar.stop()
         levels.stop()
+        clipboard.stop()
         alarm.stop()
     }
 
@@ -355,7 +362,7 @@ public final class IslandModel {
         case .headphones: settings.headphoneAlertsEnabled
         case .level: settings.levelsEnabled
         case .upcomingEvent: settings.calendarEnabled
-        case .timerFinished, .welcome, .shortcut: true
+        case .timerFinished, .focusPhase, .welcome, .shortcut: true
         }
     }
 
@@ -403,7 +410,33 @@ public final class IslandModel {
         timer.cancel()
     }
 
+    /// Starts a Pomodoro run: 25 min focus, 5 min breaks, a long break every fourth session.
+    public func startFocus() {
+        stopAlarmIfNeeded()
+        timer.startFocus()
+        collapse()
+    }
+
+    /// Opens an event's video call and closes the notch.
+    public func joinMeeting(_ url: URL) {
+        NSWorkspace.shared.open(url)
+        alerts.removeAll(of: .calendar)
+        collapse()
+        pumpAlerts()
+        scheduleAlertExpiry()
+    }
+
     private func timerDidFinish() {
+        // A focus run rolls straight into its next phase with one chime instead of the alarm.
+        if timer.focus != nil, let next = timer.advanceFocus() {
+            if settings.timerSound {
+                chime?.stop()
+                chime = NSSound(named: NSSound.Name("Glass"))
+                chime?.play()
+            }
+            receive(.focusPhase(next.phase, completed: next.completed))
+            return
+        }
         receive(.timerFinished)
         if settings.timerSound {
             alarm.start()
@@ -501,6 +534,23 @@ public final class IslandModel {
         return true
     }
 
+    // MARK: Clipboard
+
+    /// Copies a remembered clip back to the clipboard.
+    public func copyClip(_ clip: ClipboardHistory.Clip) {
+        clipboard.copy(clip)
+        Haptics.perform(enabled: settings.hapticsEnabled)
+    }
+
+    /// Clipboard history needs both the Tray and its own switch; turning either off forgets it.
+    private func updateClipboardWatching() {
+        if settings.trayEnabled && settings.clipboardHistoryEnabled {
+            clipboard.start()
+        } else if clipboard.isRunning || !clipboard.clips.isEmpty {
+            clipboard.stop()
+        }
+    }
+
     // MARK: Observation
 
     /// Clears choices that point at activities which have ended, so they don't come back
@@ -534,6 +584,7 @@ public final class IslandModel {
             _ = settings.airDropEnabled
             _ = settings.trayEnabled
             _ = settings.mirrorEnabled
+            _ = settings.clipboardHistoryEnabled
         } onChange: { [weak self] in
             Task { @MainActor [weak self] in
                 guard let self else { return }
@@ -544,6 +595,7 @@ public final class IslandModel {
                 }
                 if case .tray = self.expandTarget, !self.settings.trayEnabled { self.collapse() }
                 if case .mirror = self.expandTarget, !self.settings.mirrorEnabled { self.collapse() }
+                self.updateClipboardWatching()
                 self.observeSettings()
             }
         }

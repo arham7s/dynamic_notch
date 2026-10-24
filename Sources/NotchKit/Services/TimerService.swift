@@ -7,9 +7,11 @@ public final class TimerService {
     public private(set) var timer: CountdownTimer?
     /// Duration of the last timer started, used by "Repeat".
     public private(set) var lastDuration: TimeInterval?
+    /// Set while a focus (Pomodoro) run is going; nil for a plain timer.
+    public private(set) var focus: FocusCycle?
 
-    /// Quick starts shown in the pill.
-    public static let presets: [TimeInterval] = [60, 300, 600, 900, 1800]
+    /// Quick starts shown in the pill, beside the Focus chip.
+    public static let presets: [TimeInterval] = [60, 300, 600, 900]
     /// Quick starts shown in the menu bar menu, which has more room.
     public static let menuPresets: [TimeInterval] = [60, 180, 300, 600, 900, 1800, 3600]
 
@@ -38,7 +40,30 @@ public final class TimerService {
         return !timer.isFinished
     }
 
+    /// Starts a plain timer, ending any focus run.
     public func start(duration: TimeInterval) {
+        focus = nil
+        begin(duration: duration)
+    }
+
+    /// Starts a focus run with its first 25-minute session.
+    public func startFocus() {
+        let cycle = FocusCycle()
+        focus = cycle
+        begin(duration: cycle.duration)
+    }
+
+    /// Moves a finished focus phase on to the next one and starts it.
+    @discardableResult
+    public func advanceFocus() -> FocusCycle? {
+        guard var cycle = focus else { return nil }
+        cycle.advance()
+        focus = cycle
+        begin(duration: cycle.duration)
+        return cycle
+    }
+
+    private func begin(duration: TimeInterval) {
         let started = CountdownTimer(duration: duration, now: now())
         timer = started
         lastDuration = started.duration
@@ -67,6 +92,7 @@ public final class TimerService {
 
     public func cancel() {
         timer = nil
+        focus = nil
         scheduleCompletion()
     }
 

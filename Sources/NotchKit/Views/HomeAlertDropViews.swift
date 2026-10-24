@@ -66,7 +66,7 @@ struct AlertView: View {
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(Text(kind == .volume ? "Volume" : "Brightness"))
             .accessibilityValue(Text(muted ? "Muted" : "\(Int((value * 100).rounded())) percent"))
-        case .upcomingEvent(let title, let minutes):
+        case .upcomingEvent(let title, let minutes, let meetingURL):
             AlertRow(cameraGap: cameraGap) {
                 HStack(spacing: 6 * s) {
                     Image(systemName: "calendar")
@@ -76,8 +76,34 @@ struct AlertView: View {
                         .truncationMode(.tail)
                 }
             } trailing: {
-                Text(minutes <= 0 ? "Starting now" : "In \(minutes) min")
-                    .foregroundStyle(NotchColor.red)
+                if let meetingURL {
+                    HStack(spacing: 6 * s) {
+                        Text(minutes <= 0 ? "Now" : "\(minutes) min")
+                            .foregroundStyle(NotchColor.red)
+                            .fixedSize()
+                        Button("Join") { model.joinMeeting(meetingURL) }
+                            .buttonStyle(ChipButtonStyle(tint: NotchColor.green, scale: s))
+                            .frame(width: 52 * s)
+                            .accessibilityLabel(Text("Join \(title)"))
+                    }
+                } else {
+                    Text(minutes <= 0 ? "Starting now" : "In \(minutes) min")
+                        .foregroundStyle(NotchColor.red)
+                }
+            }
+            .accessibilityElement(children: meetingURL == nil ? .combine : .contain)
+        case .focusPhase(let phase, let completed):
+            let tint = phase == .focus ? NotchColor.orange : NotchColor.green
+            AlertRow(cameraGap: cameraGap) {
+                HStack(spacing: 6 * s) {
+                    Image(systemName: FocusCycle.symbol(phase))
+                        .foregroundStyle(tint)
+                    Text(FocusCycle.title(phase))
+                        .lineLimit(1)
+                }
+            } trailing: {
+                Text(phase == .focus ? "Session \(completed + 1)" : "\(Int(FocusCycle.duration(of: phase) / 60)) min")
+                    .foregroundStyle(tint)
             }
             .accessibilityElement(children: .combine)
         case .shortcut(let name, let succeeded):

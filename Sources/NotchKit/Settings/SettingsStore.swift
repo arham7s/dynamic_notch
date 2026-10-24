@@ -47,6 +47,8 @@ public final class SettingsStore {
     public var lowBatteryAlertsEnabled: Bool { didSet { defaults.set(lowBatteryAlertsEnabled, forKey: Key.lowBattery) } }
     public var headphoneAlertsEnabled: Bool { didSet { defaults.set(headphoneAlertsEnabled, forKey: Key.headphones) } }
     public var trayEnabled: Bool { didSet { defaults.set(trayEnabled, forKey: Key.tray) } }
+    /// Keep recent copied text in the Tray. Off by default; held in memory only.
+    public var clipboardHistoryEnabled: Bool { didSet { defaults.set(clipboardHistoryEnabled, forKey: Key.clipboardHistory) } }
     public var mirrorEnabled: Bool { didSet { defaults.set(mirrorEnabled, forKey: Key.mirror) } }
     public var calendarEnabled: Bool { didSet { defaults.set(calendarEnabled, forKey: Key.calendar) } }
     public var shortcutsEnabled: Bool { didSet { defaults.set(shortcutsEnabled, forKey: Key.shortcuts) } }
@@ -93,6 +95,7 @@ public final class SettingsStore {
         headphoneAlertsEnabled = defaults.object(forKey: Key.headphones) as? Bool ?? true
         hasShownWelcome = defaults.bool(forKey: Key.welcome)
         trayEnabled = defaults.object(forKey: Key.tray) as? Bool ?? true
+        clipboardHistoryEnabled = defaults.object(forKey: Key.clipboardHistory) as? Bool ?? false
         mirrorEnabled = defaults.object(forKey: Key.mirror) as? Bool ?? true
         calendarEnabled = defaults.object(forKey: Key.calendar) as? Bool ?? true
         shortcutsEnabled = defaults.object(forKey: Key.shortcuts) as? Bool ?? true
@@ -144,6 +147,7 @@ public final class SettingsStore {
         static let linger = "nowPlaying.pausedLinger"
         static let welcome = "app.hasShownWelcome"
         static let tray = "home.tray"
+        static let clipboardHistory = "home.clipboardHistory"
         static let mirror = "home.mirror"
         static let calendar = "home.calendar"
         static let shortcuts = "home.shortcuts"

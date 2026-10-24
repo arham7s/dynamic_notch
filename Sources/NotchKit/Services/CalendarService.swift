@@ -9,13 +9,16 @@ public struct CalendarEvent: Equatable, Sendable, Identifiable {
     public var start: Date
     public var end: Date
     public var color: ColorMath.RGB
+    /// Video-call link found in the event (Meet, Zoom, Teams, Webex…), if any.
+    public var meetingURL: URL?
 
-    public init(id: String, title: String, start: Date, end: Date, color: ColorMath.RGB = .white) {
+    public init(id: String, title: String, start: Date, end: Date, color: ColorMath.RGB = .white, meetingURL: URL? = nil) {
         self.id = id
         self.title = title
         self.start = start
         self.end = end
         self.color = color
+        self.meetingURL = meetingURL
     }
 
     public func isHappening(at date: Date) -> Bool {
@@ -43,6 +46,39 @@ public enum CalendarRules {
             .filter { !reminded.contains($0.id) && $0.start > date }
             .map { (event: $0, at: max(date, $0.start.addingTimeInterval(-reminderLead))) }
             .min { $0.at < $1.at }
+    }
+
+    /// How long before an event starts the Home row offers "Join".
+    public static let joinLead: TimeInterval = 15 * 60
+
+    /// Whether to offer "Join" for this event right now.
+    public static func canJoin(_ event: CalendarEvent, at date: Date) -> Bool {
+        event.meetingURL != nil && event.end > date && event.start.timeIntervalSince(date) <= joinLead
+    }
+
+    /// Hosts treated as video calls. Subdomains count too (us02web.zoom.us, company.webex.com).
+    static let meetingHosts = [
+        "meet.google.com", "zoom.us", "zoomgov.com", "teams.microsoft.com", "teams.live.com",
+        "webex.com", "whereby.com", "facetime.apple.com", "meet.jit.si", "chime.aws",
+    ]
+
+    /// The first video-call link in the event's URL, location or notes, in that order.
+    public static func meetingURL(in texts: [String?]) -> URL? {
+        guard let detector = try? NSDataDetector(types: NSTextCheckingResult.CheckingType.link.rawValue) else { return nil }
+        for text in texts.compactMap({ $0 }) where !text.isEmpty {
+            let range = NSRange(text.startIndex..., in: text)
+            for match in detector.matches(in: text, range: range) {
+                guard let url = match.url, isMeetingLink(url) else { continue }
+                return url
+            }
+        }
+        return nil
+    }
+
+    static func isMeetingLink(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased(), scheme == "https" || scheme == "http",
+              let host = url.host?.lowercased() else { return false }
+        return meetingHosts.contains { host == $0 || host.hasSuffix("." + $0) }
     }
 
     /// "now", "in 12 min", "in 1 hr", or a clock time for later today.
@@ -117,6 +153,12 @@ public final class CalendarService {
         }
     }
 
+    /// Opens the event's video-call link in its app or the browser.
+    public func join(_ event: CalendarEvent) {
+        guard let url = event.meetingURL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
     public func openCalendarApp() {
         if let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.iCal") {
             NSWorkspace.shared.openApplication(at: url, configuration: NSWorkspace.OpenConfiguration())
@@ -154,7 +196,8 @@ public final class CalendarService {
                     title: event.title?.isEmpty == false ? event.title! : String(localized: "Event"),
                     start: event.startDate,
                     end: event.endDate,
-                    color: Self.rgb(event.calendar?.color)
+                    color: Self.rgb(event.calendar?.color),
+                    meetingURL: CalendarRules.meetingURL(in: [event.url?.absoluteString, event.location, event.notes])
                 )
             }
             .sorted { $0.start < $1.start }

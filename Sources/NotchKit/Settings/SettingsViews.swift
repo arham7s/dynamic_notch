@@ -280,6 +280,8 @@ struct HomeSettingsView: View {
         Form {
             Section {
                 IconToggle(title: "File Tray", detail: "Drop files on the notch to keep them for later", symbol: "tray.full.fill", color: .cyan, isOn: $settings.trayEnabled)
+                IconToggle(title: "Clipboard History", detail: "The last 20 texts you copied, in the Tray. Kept in memory only, never saved; skips passwords.", symbol: "doc.on.clipboard.fill", color: .teal, isOn: $settings.clipboardHistoryEnabled)
+                    .disabled(!settings.trayEnabled)
                 IconToggle(title: "Mirror", detail: "A quick camera preview before calls", symbol: "person.crop.square.fill", color: .purple, isOn: $settings.mirrorEnabled)
             } header: {
                 Text("Tabs")

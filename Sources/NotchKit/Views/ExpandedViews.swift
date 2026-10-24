@@ -144,9 +144,15 @@ struct TimerExpandedView: View {
             CircleButton(symbol: "xmark", size: 48 * s, label: "Cancel Timer") { model.cancelTimer() }
             Spacer(minLength: 8 * s)
             VStack(alignment: .trailing, spacing: -4 * s) {
-                Text("Timer")
+                Group {
+                    if let focus = model.timer.focus {
+                        Text("\(FocusCycle.title(focus.phase)) · \(focus.completed) done")
+                    } else {
+                        Text("Timer")
+                    }
+                }
                     .font(.system(size: 13 * s, weight: .semibold))
-                    .foregroundStyle(NotchColor.orange)
+                    .foregroundStyle(model.timer.focus?.isBreak == true ? NotchColor.green : NotchColor.orange)
                 if let timer {
                     CountdownText(timer: timer)
                         .font(.system(size: 42 * s, weight: .light))
