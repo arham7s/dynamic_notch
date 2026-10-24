@@ -1,0 +1,24 @@
+name: Build app
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Show toolchain
+        run: swift --version
+      - name: Build Dynamic Notch.app
+        run: ./Scripts/build-app.sh
+      - name: Zip app
+        run: ditto -c -k --keepParent "build/Dynamic Notch.app" DynamicNotch-macOS.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: DynamicNotch-macOS
+          path: DynamicNotch-macOS.zip
