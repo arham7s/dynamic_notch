@@ -65,12 +65,12 @@ struct FocusCycleTests {
         let service = TimerService(now: { clock })
         service.startFocus()
         #expect(service.focus?.phase == .focus)
-        #expect(service.timer?.duration == 25 * 60)
+        #expect(service.timer?.duration == FocusCycle.focusLength)
 
         clock = clock.addingTimeInterval(25 * 60 + 1)
         let next = try #require(service.advanceFocus())
         #expect(next.phase == .shortBreak)
-        #expect(service.timer?.duration == 5 * 60)
+        #expect(service.timer?.duration == FocusCycle.shortBreakLength)
         #expect(service.isActive)
 
         service.start(duration: 60)
