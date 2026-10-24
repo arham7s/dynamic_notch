@@ -4,6 +4,8 @@
 
 <h1 align="center">Dynamic Notch</h1>
 
+<p align="center"><sub>Copy of <a href="https://github.com/shandilyaswagat/dynamic_notch">shandilyaswagat/dynamic_notch</a>. All credit to the original author.</sub></p>
+
 <p align="center">
   The iPhone's Dynamic Island, but for your MacBook's notch.<br>
   <b><a href="https://github.com/shandilyaswagat/dynamic_notch/releases/latest/download/DynamicNotch.dmg">Download it here</a></b> (free, needs macOS 14 or newer)
