@@ -8,7 +8,8 @@
 
 <p align="center">
   The iPhone's Dynamic Island, but for your MacBook's notch.<br>
-  <b><a href="https://github.com/shandilyaswagat/dynamic_notch/releases/latest/download/DynamicNotch.dmg">Download it here</a></b> (free, needs macOS 14 or newer)
+  <b><a href="https://github.com/arham7s/dynamic_notch/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess">Download the latest build</a></b> (free, needs macOS 14 or newer)<br>
+  <sub>Open the top run, then download <b>DynamicNotch-macOS</b> under Artifacts (sign in to GitHub first).</sub>
 </p>
 
 ---
@@ -47,8 +48,9 @@ It doesn't need an account, doesn't go online and doesn't track anything. All of
 Heads up: I haven't paid Apple for a developer account yet, so the first time you open the app
 your Mac will grumble about it. You only have to deal with this once and it takes about a minute.
 
-1. Download [DynamicNotch.dmg](https://github.com/shandilyaswagat/dynamic_notch/releases/latest/download/DynamicNotch.dmg) and open it.
-2. Drag **Dynamic Notch** into your **Applications** folder.
+1. Open the [latest build](https://github.com/arham7s/dynamic_notch/actions/workflows/build.yml?query=branch%3Amain+is%3Asuccess), click the top run and download **DynamicNotch-macOS** under
+   **Artifacts**. Unzip it (you may need to unzip twice).
+2. Drag **Dynamic Notch.app** into your **Applications** folder.
 3. Go to Applications and double-click **Dynamic Notch**. Your Mac will say it couldn't open it.
    Just hit **Done**.
 4. Open **System Settings**, go to **Privacy & Security** and scroll down a bit. You'll see a line
