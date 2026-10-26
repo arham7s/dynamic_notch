@@ -45,11 +45,17 @@ struct NotchLayoutTests {
         #expect(layout(.hidden(peek: true)).pillOpacity == 1)
     }
 
-    @Test func peekSwellsTheNotchSlightly() throws {
+    @Test func peekSwellsTheNotchWithRoomForTimeAndBattery() throws {
         let notch = try #require(engine.notchInWindow)
-        let peek = layout(.hidden(peek: true)).pill
-        #expect(peek.width > notch.width && peek.width < notch.width + 40)
-        #expect(peek.height > notch.height && peek.height < notch.height + 6)
+        let peek = layout(.hidden(peek: true))
+        // Clearly wider than the notch, but still smaller than the compact activity pill.
+        #expect(peek.pill.width >= notch.width + 100)
+        #expect(peek.pill.width <= engine.windowSize.width)
+        #expect(peek.pill.height > notch.height && peek.pill.height <= notch.height + IslandMetrics.peekDrop)
+        #expect(peek.pill.midX == notch.midX)
+        // The camera stays clear between the time and the battery.
+        #expect(peek.cameraGap == notch.width)
+        #expect(peek.content.width > notch.width)
     }
 
     @Test func compactKeepsTheCameraClearAndHasEars() throws {
