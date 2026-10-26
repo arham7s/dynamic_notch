@@ -94,6 +94,11 @@ public enum IslandMetrics {
     public static let hoverGrowth = CGSize(width: 3, height: 2)
     /// Extra hit area around the shape so the pointer doesn't have to be pixel-perfect.
     public static let hitSlop: CGFloat = 4
+    /// Notch style: width of each side the notch grows by when hovered, room for the clock
+    /// and battery so it is obvious the notch is alive.
+    public static let peekEarWidth: CGFloat = 66
+    /// Notch style: how far the hovered notch drops below the real one.
+    public static let peekDrop: CGFloat = 6
     /// Width of the virtual notch on displays without one.
     public static let virtualNotchWidth: CGFloat = 180
 }

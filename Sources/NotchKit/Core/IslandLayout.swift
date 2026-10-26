@@ -413,10 +413,17 @@ public struct LayoutEngine: Equatable, Sendable {
         case .hidden(let peek):
             if let notch = notchInWindow {
                 if peek {
-                    // The notch swells a little to show it can be clicked.
-                    layout.pill = shape(body: notch.width + 20, height: notch.height + 3, flare: 5)
-                    layout.flare = 5
-                    layout.bottomRadius = 11
+                    // The notch swells out to both sides with the time and battery, so it is
+                    // obvious it can be clicked.
+                    let ear = (IslandMetrics.peekEarWidth * scale).rounded()
+                    let flare = IslandMetrics.compactFlare + 2
+                    layout.pill = shape(body: notch.width + 2 * ear, height: notch.height + IslandMetrics.peekDrop, flare: flare)
+                    layout.flare = flare
+                    layout.bottomRadius = 14
+                    layout.shadow = 0.6
+                    layout.stroke = 1.6
+                    layout.content = CGRect(x: layout.pill.minX + flare, y: 0, width: layout.pill.width - 2 * flare, height: notch.height)
+                    layout.cameraGap = notch.width
                 } else {
                     // Tucked just inside the real notch so growth starts from the notch itself.
                     // Fully transparent at rest, so screenshots and recordings show nothing.
@@ -560,8 +567,12 @@ public struct LayoutEngine: Equatable, Sendable {
     public func interactiveRects(for presentation: IslandPresentation, layout: IslandLayout) -> [CGRect] {
         let slop = IslandMetrics.hitSlop
         switch presentation {
-        case .hidden:
+        case .hidden(let peek):
             guard let notch = notchInWindow, style == .notch || isUnderNotch else { return [] }
+            // Once swollen, the whole shape stays hoverable so moving onto an ear keeps it open.
+            if peek, style == .notch, layout.pill.width > notch.width {
+                return [layout.pill.insetBy(dx: -slop, dy: -slop)]
+            }
             return [CGRect(x: notch.minX, y: 0, width: notch.width, height: notch.maxY + slop)]
         case .compact(_, let secondary):
             var rects = [layout.pill.insetBy(dx: -slop, dy: -slop)]

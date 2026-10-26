@@ -137,3 +137,54 @@ private struct TimerRing: View {
         }
     }
 }
+
+/// Shown while the pointer is over the resting notch: the time on the left of the camera and
+/// the battery on the right, so the notch visibly comes alive and invites a click.
+struct PeekView: View {
+    let model: IslandModel
+    let size: CGSize
+    let cameraGap: CGFloat
+    @Environment(\.notchScale) private var s
+
+    var body: some View {
+        let edge = 10 * s
+        let side = max(0, (size.width - cameraGap) / 2 - edge - 4)
+        HStack(spacing: 0) {
+            TimelineView(.everyMinute) { context in
+                Text(context.date, format: .dateTime.hour().minute())
+                    .font(.system(size: 13 * s, weight: .semibold))
+                    .monospacedDigit()
+                    .foregroundStyle(.white)
+            }
+            .frame(width: side, alignment: .leading)
+            Spacer(minLength: 0)
+            Group {
+                if let battery = model.power.snapshot, battery.hasBattery {
+                    HStack(spacing: 4 * s) {
+                        Text("\(battery.level)%")
+                            .font(.system(size: 12 * s, weight: .semibold))
+                            .monospacedDigit()
+                            .foregroundStyle(battery.isCharging ? NotchColor.green : NotchColor.secondaryText)
+                        BatteryGlyph(
+                            level: battery.level,
+                            isCharging: battery.isCharging,
+                            color: battery.isCharging ? NotchColor.green : (battery.level <= 20 ? NotchColor.red : .white),
+                            width: 22 * s
+                        )
+                    }
+                } else {
+                    Image(systemName: "capsule.portrait.fill")
+                        .font(.system(size: 12 * s, weight: .semibold))
+                        .foregroundStyle(NotchColor.secondaryText)
+                }
+            }
+            .frame(width: side, alignment: .trailing)
+        }
+        .padding(.horizontal, edge)
+        .frame(width: size.width, height: size.height)
+        .lineLimit(1)
+        .minimumScaleFactor(0.7)
+        .accessibilityElement(children: .combine)
+        .accessibilityHint(Text("Click to open"))
+    }
+}

@@ -51,7 +51,7 @@ struct IslandContentLayer: View {
 
     private var pill: some View {
         ZStack(alignment: .topLeading) {
-            if presentation.isVisible {
+            if presentation.isVisible || (presentation == .hidden(peek: true) && layout.content.width > 0) {
                 NotchContent(model: model, presentation: presentation, size: layout.content.size, cameraGap: layout.cameraGap, stripHeight: layout.stripHeight)
                     .environment(\.notchScale, layout.contentScale)
                     .frame(width: layout.content.width, height: layout.content.height)
@@ -105,7 +105,7 @@ private struct ContentKey: Hashable {
 
     init(_ presentation: IslandPresentation) {
         value = switch presentation {
-        case .hidden: "hidden"
+        case .hidden(let peek): peek ? "peek" : "hidden"
         case .idle: "idle"
         case .compact(let primary, _): "compact.\(primary.rawValue)"
         case .expanded(let kind): "expanded.\(kind.rawValue)"
@@ -129,6 +129,8 @@ struct NotchContent: View {
 
     var body: some View {
         switch presentation {
+        case .hidden(peek: true):
+            PeekView(model: model, size: size, cameraGap: cameraGap)
         case .hidden, .idle:
             Color.clear
         case .compact(let primary, _):

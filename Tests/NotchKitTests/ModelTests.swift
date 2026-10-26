@@ -184,6 +184,12 @@ struct IslandModelTests {
         let notch = try #require(model.engine.notchInWindow)
         #expect(model.pointerMoved(to: CGPoint(x: notch.midX, y: 10)))
         #expect(model.presentation == .hidden(peek: true))
+        // The swollen notch is clearly wider than the real one and stays hovered on its ears.
+        let peek = model.layout
+        #expect(peek.pill.width >= notch.width + 100)
+        #expect(peek.content.width > 0)
+        #expect(model.pointerMoved(to: CGPoint(x: notch.maxX + 30, y: 10)))
+        #expect(model.presentation == .hidden(peek: true))
         #expect(!model.pointerMoved(to: CGPoint(x: notch.midX, y: 200)))
         #expect(model.presentation == .hidden(peek: false))
         #expect(!model.pointerMoved(to: nil))
