@@ -110,12 +110,18 @@ public final class LevelMonitor {
     /// Brightness at the start of the current burst of callbacks. A key press may arrive as a
     /// short animated burst, so the change is measured across the burst, not per callback.
     private var burstAnchor: Double?
+    private var burstStart = Date.distantPast
     private var lastCallback = Date.distantPast
+    /// A key press finishes its animation well inside this. Automatic brightness can send
+    /// callbacks nonstop for minutes, so a burst is re-anchored after this long; otherwise its
+    /// slow drift adds up past `brightnessStep` and the indicator never goes away.
+    nonisolated static let maximumBurst: TimeInterval = 0.8
 
     func brightnessChanged(to value: Double, at now: Date = Date()) {
         guard isRunning else { return }
-        if now.timeIntervalSince(lastCallback) > 0.5 {
+        if now.timeIntervalSince(lastCallback) > 0.5 || now.timeIntervalSince(burstStart) > Self.maximumBurst {
             burstAnchor = lastBrightness
+            burstStart = now
         }
         lastCallback = now
         lastBrightness = value
